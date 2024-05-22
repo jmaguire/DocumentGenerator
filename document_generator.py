@@ -7,7 +7,7 @@ from docx.oxml.ns import qn
 import html2text
 import re
 import logging
-
+from functools import lru_cache
 
 class DocumentGenerator:
     BORDER_COLOR_DEFAULT = "000000"
@@ -25,10 +25,11 @@ class DocumentGenerator:
         self.h.body_width = 0
         self.setup_logging()
 
-    def setup_logging(self):
-        logging.basicConfig(level=logging.INFO,
-                            format='%(asctime)s - %(levelname)s - %(message)s')
+    @staticmethod
+    def setup_logging():
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+    @lru_cache(maxsize=None)
     def clean_text(self, text):
         """
         Clean and format text from HTML to plain text.
