@@ -14,6 +14,15 @@ import html2text
 
 
 class DocumentGenerator:
+    """
+    A class to generate Word documents from assessment API responses.
+
+    Attributes:
+        data_file (str): Path to the JSON data file.
+        document (Document): A Document object from python-docx to build the Word document.
+        html_parser (HTML2Text): An HTML to text parser.
+    """
+
     BORDER_COLOR_DEFAULT = "000000"
     BORDER_SIZE_DEFAULT = "4"
     CELL_BG_COLOR_WHITE = "FFFFFF"
@@ -26,8 +35,8 @@ class DocumentGenerator:
     def __init__(self, data_file: str):
         self.data_file = data_file
         self.document = Document()
-        self.h = html2text.HTML2Text()
-        self.h.body_width = 0
+        self.html_parser = html2text.HTML2Text()
+        self.html_parser.body_width = 0
         self.setup_logging()
 
     @staticmethod
@@ -44,7 +53,7 @@ class DocumentGenerator:
         :return: The cleaned plain text.
         """
         pattern = r'\n[ \t]*\n[ \t]*\n'
-        text = self.h.handle(text).strip()
+        text = self.html_parser.handle(text).strip()
         return re.sub(pattern, '\n\n', text)
 
     def parse_markdown_table(self, markdown):
@@ -54,6 +63,16 @@ class DocumentGenerator:
         return headers, rows
 
     def handle_answer_type(self, answer_value: str, answer_type: str) -> str:
+        """
+        Process and format the answer based on its type.
+
+        Args:
+            answer_value (str): The value of the answer.
+            answer_type (str): The type of the answer (e.g., "Currency", "Percentage").
+
+        Returns:
+            str: The formatted answer.
+        """
         if answer_type == "Currency":
             return answer_value.replace(" ", "")
         if answer_type == "Percentage":
@@ -62,7 +81,7 @@ class DocumentGenerator:
             return answer_value.strip()
         return self.clean_text(answer_value)
 
-    def set_table_border(self, table, border_color=BORDER_COLOR_DEFAULT, border_size=BORDER_SIZE_DEFAULT):
+    def set_table_border(self, table, border_color: str=BORDER_COLOR_DEFAULT, border_size: str=BORDER_SIZE_DEFAULT):
         tbl = table._element
         tblBorders = OxmlElement('w:tblBorders')
         for border_name in ["top", "left", "bottom", "right", "insideH", "insideV"]:
@@ -73,13 +92,13 @@ class DocumentGenerator:
             tblBorders.append(border)
         tbl.tblPr.append(tblBorders)
 
-    def set_cell_background(self, cell, color):
+    def set_cell_background(self, cell, color: str):
         cell_properties = cell._element.get_or_add_tcPr()
         shd = OxmlElement('w:shd')
         shd.set(qn('w:fill'), color)
         cell_properties.append(shd)
 
-    def set_cell_margins(self, cell, top=0.08, start=0.16, bottom=0.08, end=0.16):
+    def set_cell_margins(self, cell, top: float = 0.08, start: float = 0.16, bottom: float = 0.08, end: float = 0.16):
         tcPr = cell._element.get_or_add_tcPr()
         tcMar = OxmlElement('w:tcMar')
         for margin_type, margin_size in [('top', top), ('start', start), ('bottom', bottom), ('end', end)]:
@@ -89,10 +108,10 @@ class DocumentGenerator:
             tcMar.append(mar)
         tcPr.append(tcMar)
 
-    def set_cell_width(self, cell, width):
+    def set_cell_width(self, cell, width:float):
         cell.width = Inches(width)
 
-    def _style_table_row(self, row_cells, header_color=CELL_BG_COLOR_BLUE, body_color=CELL_BG_COLOR_WHITE, width=.75):
+    def _style_table_row(self, row_cells, header_color: str=CELL_BG_COLOR_BLUE, body_color: str=CELL_BG_COLOR_WHITE, width: float=.75):
         self.set_cell_background(row_cells[0], header_color)
         self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
         self.set_cell_width(row_cells[0], width)
@@ -177,6 +196,8 @@ class DocumentGenerator:
         # Comments and documents
         question_table = add_question_row(
             question_table, "Comment", self.clean_text(quest["answerComments"]))
+        
+        # Flatten the list of documents from nested lists
         documents = [doc for docList in quest["docListAnswer"]
                      for doc in docList["attachedFiles"]]
         documentAsList = ", ".join(documents)
@@ -244,6 +265,14 @@ class DocumentGenerator:
         self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
 
     def generate_document(self):
+        """
+        Generate the Word document from the JSON data file.
+
+        This method reads the JSON data file, sets up the document properties,
+        adds assessment metadata and question information, and saves the document
+        as 'demo.docx'. Logs errors if the data file is not found or if there's
+        an issue decoding JSON.
+        """
 
         try:
             with open(self.data_file, "r") as f:
