@@ -84,45 +84,57 @@ class DocumentGenerator:
         documents = [doc for docList in quest["docListAnswer"] for doc in docList["attachedFiles"]]
         documentAsList = ", ".join(documents)
         question_table = add_row(question_table, "Documents", documentAsList)
+    
+    def get_nested_value(self, data, keys, default=None):
+      for key in keys:
+          if isinstance(data, dict):
+              data = data.get(key, default)
+          else:
+              return default
+          if data is default:
+              break
+      return data
+
 
     def generate_document(self):
+        
+        def add_row(table, name, value):
+            if not value:
+                return table
+            row_cells = table.add_row().cells
+            row_cells[0].text = name
+            self.set_cell_background(row_cells[0], "DFEFFD")
+            self.set_cell_margins(row_cells[0])
+            row_cells[1].text = value
+            self.set_cell_background(row_cells[1], "F5F5F5")
+            self.set_cell_margins(row_cells[1])
+            return table
+        
         with open(self.data_file, "r") as f:
             data = json.load(f)
 
-        meta_data = {
-            "Assessment": data["pqiBasicInfo"]["questionnaireBasicInfo"]["qStructureBasicInfo"]["name"],
-            "Report run on": data["reportGeneratedOn"],
-            "Published by": data["pqiBasicInfo"]["publishedByUser"]["companyName"] + " at " + data["pqiBasicInfo"]["publishedByUser"]["userProfile"]["fullName"],
-            "Published on": data["pqiBasicInfo"]["publishedDate"]
-        }
-
-        evaluation_data = {
-            "Completed on": data["pqiBasicInfo"]["evaluationCompleteDate"],
-            "Grade": data["pqiBasicInfo"]["gradeDetails"]["name"] if data["pqiBasicInfo"]["gradeDetails"] else "",
-            "Score": data["pqiBasicInfo"]["evaluationScore"]
-        }
-
-        is_evaluated = bool(data["pqiBasicInfo"]["evaluationCompleteDate"])
 
         self.document.add_heading('Assessment Export', level=1)
         self.document.add_heading('Details', level=2)
         table = self.document.add_table(rows=0, cols=2, style='Table Grid')
         self.set_table_border(table, border_color="CCCCCC", border_size="4")
 
-        for entry, value in meta_data.items():
-            row_cells = table.add_row().cells
-            row_cells[0].text = entry
-            self.set_cell_background(row_cells[0], "DFEFFD")
-            self.set_cell_margins(row_cells[0])
-            row_cells[1].text = value
-            self.set_cell_background(row_cells[1], "F5F5F5")
-            self.set_cell_margins(row_cells[1])
+        asssessment_name = self.get_nested_value(data, ["pqiBasicInfo", "questionnaireBasicInfo", "qStructureBasicInfo", "name"], "")
+        report_run_on = self.get_nested_value(data, ["reportGeneratedOn"], "")
+        publishing_partner = self.get_nested_value(data, ["pqiBasicInfo", "publishedByUser", "companyName"], "")
+        publishing_user = self.get_nested_value(data, ["pqiBasicInfo", "publishedByUser", "userProfile", "fullName"], "")
+        published_on = self.get_nested_value(data, ["pqiBasicInfo", "publishedDate"], "")
+        recipient_partner = self.get_nested_value(data, ["partner", "name"], "")
+        recipient_user = self.get_nested_value(data, ["pqiBasicInfo", "publishedToContact", "contactProfile", "fullName"], "")
 
-        if is_evaluated:
-            for entry, value in evaluation_data.items():
-                row_cells = table.add_row().cells
-                row_cells[0].text = entry
-                row_cells[1].text = value
+        add_row(table, "Assessment", asssessment_name)
+        add_row(table, "Report Generated", report_run_on)
+        add_row(table, "Report run on", report_run_on)
+        add_row(table, "Publisher", publishing_partner)
+        add_row(table, "Published By", publishing_user)
+        add_row(table, "Published On", published_on)
+        add_row(table, "Recipient", recipient_partner)
+        add_row(table, "Recieved By", recipient_user)
 
         self.document.add_page_break()
 
