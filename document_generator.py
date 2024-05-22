@@ -85,43 +85,54 @@ class DocumentGenerator:
     def set_cell_width(self, cell, width):
         cell.width = Inches(width)
 
+    def _style_table_row(self, row_cells):
+        self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
+        self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
+        self.set_cell_width(row_cells[0], .75)
+        self.set_cell_background(row_cells[1], self.CELL_BG_COLOR_BODY)
+        self.set_cell_margins(row_cells[1], .04, .08, .04, .08)
+
+    def _add_question_header(self, question_table, quest: Dict[str, Any]):
+        row_cells = question_table.add_row().cells
+        row_cells[0].merge(row_cells[1])
+        row_cells[0].text = f"{self.clean_text(quest['elementNumber'])} {self.clean_text(quest['questionText'])}"
+        self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
+        self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
+
+    def _create_question_table(self):
+        question_table = self.document.add_table(rows=0, cols=2, style=self.TABLE_STYLE)
+        self.set_table_border(
+            question_table, border_color=self.BORDER_COLOR_GREY, border_size=self.BORDER_SIZE_DEFAULT)
+        return question_table
+
+    def _populate_table(self, table, headers: list, rows: list):
+        hdr_cells = table.add_row().cells
+        for index, header in enumerate(headers):
+            hdr_cells[index].text = header
+            self.set_cell_background(hdr_cells[index], self.CELL_BG_COLOR_WHITE)
+        for row in rows:
+            data_cells = table.add_row().cells
+            for index, value in enumerate(row):
+                data_cells[index].text = value
+                self.set_cell_background(data_cells[index], self.CELL_BG_COLOR_WHITE)
+
     def build_question(self, quest):
         def add_question_row(table, name, value):
             value = value if value else "N/A"
             row_cells = table.add_row().cells
             row_cells[0].text = name
             row_cells[1].text = value
-            self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
-            self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
-            self.set_cell_width(row_cells[0], .75)
-            self.set_cell_background(row_cells[1], self.CELL_BG_COLOR_BODY)
-            self.set_cell_margins(row_cells[1], .04, .08, .04, .08)
+            self._style_table_row(row_cells)
             return table
         
         def add_question_table_row(table, name, value):
-            table_data = self.parse_markdown_table(value)
-            cols = len(table_data[0])
-            rows = len(table_data[1])
+            headers, rows = self.parse_markdown_table(value)
             row_cells = table.add_row().cells
             row_cells[0].text = name
-            table_answer = row_cells[1].add_table(rows=0, cols=cols)
+            table_answer = row_cells[1].add_table(rows=0, cols=len(headers))
             self.set_table_border(table_answer, border_color=self.BORDER_COLOR_GREY, border_size=self.BORDER_SIZE_DEFAULT)
-            hdr_cells = table_answer.add_row().cells
-            for index, value in enumerate(table_data[0]):
-                hdr_cells[index].text = value
-                self.set_cell_background(hdr_cells[index], self.CELL_BG_COLOR_WHITE)
-            for row in table_data[1]:
-                data_cells = table_answer.add_row().cells
-                for index, value in enumerate(row):
-                    data_cells[index].text = value
-                    self.set_cell_background(data_cells[index], self.CELL_BG_COLOR_WHITE)
-            self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
-            self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
-            self.set_cell_width(row_cells[0], .75)
-            self.set_cell_background(row_cells[1], self.CELL_BG_COLOR_HEADER)
-            self.set_cell_margins(row_cells[1], .04, .08, .04, .08)
-            self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
-            self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
+            self._populate_table(table_answer, headers, rows)
+            self._style_table_row(row_cells)
             return table
 
         question_table = self.document.add_table(
@@ -129,13 +140,8 @@ class DocumentGenerator:
         self.set_table_border(
             question_table, border_color=self.BORDER_COLOR_GREY, border_size=self.BORDER_SIZE_DEFAULT)
 
-        # Question header row
-        row_cells = question_table.add_row().cells
-        row_cells[0].merge(row_cells[1])
-        row_cells[0].text = self.clean_text(
-            quest["elementNumber"]) + " " + self.clean_text(quest["questionText"])
-        self.set_cell_background(row_cells[0], self.CELL_BG_COLOR_HEADER)
-        self.set_cell_margins(row_cells[0], .04, .08, .04, .08)
+        question_table = self._create_question_table()
+        self._add_question_header(question_table, quest)
 
         # Handle followup
         if quest["triggerValue"]:
@@ -244,7 +250,7 @@ class DocumentGenerator:
 
 
 if __name__ == "__main__":
-    doc_gen = DocumentGenerator("mediumdata.json")
+    doc_gen = DocumentGenerator("bigdata.json")
     try:
         doc_gen.generate_document()
     except Exception as e:
